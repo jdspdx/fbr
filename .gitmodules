@@ -1,0 +1,3 @@
+[submodule "jetstream"]
+	path = jetstream
+	url = git@github.com:bluesky-social/jetstream.git
