@@ -1,9 +1,7 @@
 #![feature(unwrap_infallible)]
 
-use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufReader;
-use std::ops::Deref;
 use serde_json::{Map, Value};
 use websocket::{ClientBuilder, OwnedMessage};
 use finalfusion::prelude::*;
@@ -20,6 +18,7 @@ struct Processor {
     vader: SentimentIntensityAnalyzer<'static>,
 }
 
+const MODEL_FILE: &str = "/Users/jstanbrough/Downloads/cc.en.300.bin";
 impl Processor {
     async fn new() -> Self {
         let vader = vader_sentiment::SentimentIntensityAnalyzer::new();
@@ -31,8 +30,7 @@ impl Processor {
         )
             .await;
 
-        let file = "/Users/jstanbrough/Downloads/cc.en.300.bin";
-        let mut reader = BufReader::new(File::open(file).expect("failed to open embeddings"));
+        let mut reader = BufReader::new(File::open(MODEL_FILE).expect("failed to open embeddings"));
 
         Processor {
             model: Embeddings::read_fasttext(&mut reader).unwrap(),
