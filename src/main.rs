@@ -1,12 +1,38 @@
+use std::fs::File;
+use std::io::BufReader;
 use serde_json::Value;
 use websocket::{ClientBuilder, OwnedMessage};
-use websocket::futures::{Future, IntoFuture, Stream};
+use finalfusion::prelude::*;
+use finalfusion::storage::NdArray;
+use finalfusion::vocab::FastTextSubwordVocab;
+use qdrant_client::{Payload, Qdrant};
+use qdrant_client::qdrant::{Distance, PointStruct, CreateCollectionBuilder, ScalarQuantizationBuilder, UpsertPointsBuilder, VectorParamsBuilder};
 
-#[derive(Clone, Default)]
-struct Processor {}
+struct Processor {
+    model: Embeddings<FastTextSubwordVocab, NdArray>,
+    qdrant: Qdrant,
+}
+
 
 impl Processor {
-    fn process(&mut self, text: String) -> Result<(), anyhow::Error> {
+    async fn new() -> Self {
+        let qdrant = Qdrant::from_url("http://localhost:6334").build().expect("failed to connect to qdrant");
+        qdrant.create_collection(
+            CreateCollectionBuilder::new("bluesky")
+                .vectors_config(VectorParamsBuilder::new(300, Distance::Cosine))
+                .quantization_config(ScalarQuantizationBuilder::default()),
+        )
+            .await.expect("failed to create collection");
+
+        let file = "/Users/jstanbrough/Downloads/cc.en.300.bin";
+        let mut reader = BufReader::new(File::open(file).expect("failed to open embeddings"));
+
+        Processor {
+            model: Embeddings::read_fasttext(&mut reader).unwrap(),
+            qdrant,
+        }
+    }
+    async fn process(&mut self, text: String) -> Result<(), anyhow::Error> {
         let v: Value = serde_json::from_str(text.as_str())?;
         let kind = v["kind"].clone();
 
@@ -40,34 +66,45 @@ impl Processor {
         if text == "" {
             return Ok(());
         }
-        
-        println!("{}", text);
+
+        let text_str = text.as_str().unwrap();
+        let embeds = self.model.embedding(text_str);
+        match embeds {
+            Some(embeds) => {
+                let embeds = embeds.to_vec();
+                let payload: Payload = v.try_into()?;
+                let points = vec![PointStruct::new(0, embeds, payload)];
+                self.qdrant
+                    .upsert_points(UpsertPointsBuilder::new("bluesky", points))
+                    .await?;
+                println!("{}", text_str)
+            }
+            _ => println!("failed to embed {}", text)
+        }
         Ok(())
     }
 }
+
+
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
     let url = "ws://localhost:6008/subscribe?wantedCollections=app.bsky.feed.post";
     let client = ClientBuilder::new(url)?
         .add_protocol("rust-websocket")
-        .async_connect_insecure();
+        .connect_insecure()?;
 
-    let mut processor = Processor::default();
-
-    let _ = client.and_then(|(duplex, _)| {
-        let (sink, stream) = duplex.split();
-        stream.filter_map(|m| {
-            match m {
-                OwnedMessage::Text(t) => {
-                    if processor.process(t).is_err() {
-                        println!("Error deserializing")
-                    }
-                    None
-                }
-                _ => None
+    let mut processor = Processor::new().await;
+    let (mut reader, _) = client.split()?;
+    loop {
+        let message = reader.recv_message()?;
+        match message {
+            OwnedMessage::Text(text) => {
+                processor.process(text).await?
             }
-        })
-            .forward(sink)
-    }).wait()?;
-    Ok(())
+            _ => {}
+        }
+    }
 }
+
+#[test]
+fn test_proc() {}
