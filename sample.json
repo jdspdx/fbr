@@ -1,0 +1,30 @@
+{
+  "did": "did:plc:5sktz44i2x3wogfq7abhlbrz",
+  "time_us": 1731962383665327,
+  "kind": "commit",
+  "commit": {
+    "rev": "3lbarkmdc5v27",
+    "operation": "create",
+    "collection": "app.bsky.feed.post",
+    "rkey": "3lbarkluxck2m",
+    "record": {
+      "$type": "app.bsky.feed.post",
+      "createdAt": "2024-11-18T20:37:03.819Z",
+      "langs": [
+        "en"
+      ],
+      "reply": {
+        "parent": {
+          "cid": "bafyreifcho7s5kzqtzc7ocfa5sjsqfinmarnuuast5i5axvqqpru7s5kay",
+          "uri": "at://did:plc:w6xlfjnqk6sh6v75muisjdre/app.bsky.feed.post/3lbar66mw5k2q"
+        },
+        "root": {
+          "cid": "bafyreien6j4eydwmgqm3ymtv7vh5z5njegbzcras7qa4veepr7s7yph5ve",
+          "uri": "at://did:plc:5dxdkowsvyeqpjwc6r4xrzsz/app.bsky.feed.post/3lb64w4yf622d"
+        }
+      },
+      "text": "Show me the contradiction? I’ll save you time, there isn’t one, the problem here is your utter lack of reading comprehension."
+    },
+    "cid": "bafyreifzqi5l5qo2a7weushr6fxuomlzfp6ayctrh6orey3e67pcxik2zm"
+  }
+}
