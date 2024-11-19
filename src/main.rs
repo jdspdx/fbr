@@ -1,8 +1,10 @@
 #![feature(unwrap_infallible)]
 
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufReader;
-use serde_json::Value;
+use std::ops::Deref;
+use serde_json::{Map, Value};
 use websocket::{ClientBuilder, OwnedMessage};
 use finalfusion::prelude::*;
 use finalfusion::storage::NdArray;
@@ -10,15 +12,17 @@ use finalfusion::vocab::FastTextSubwordVocab;
 use qdrant_client::{Payload, Qdrant};
 use qdrant_client::qdrant::{Distance, PointStruct, CreateCollectionBuilder, ScalarQuantizationBuilder, UpsertPointsBuilder, VectorParamsBuilder};
 use uuid::Uuid;
+use vader_sentiment::SentimentIntensityAnalyzer;
 
 struct Processor {
     model: Embeddings<FastTextSubwordVocab, NdArray>,
     qdrant: Qdrant,
+    vader: SentimentIntensityAnalyzer<'static>,
 }
-
 
 impl Processor {
     async fn new() -> Self {
+        let vader = vader_sentiment::SentimentIntensityAnalyzer::new();
         let qdrant = Qdrant::from_url("http://localhost:6334").build().expect("failed to connect to qdrant");
         let _ = qdrant.create_collection(
             CreateCollectionBuilder::new("bluesky")
@@ -33,6 +37,7 @@ impl Processor {
         Processor {
             model: Embeddings::read_fasttext(&mut reader).unwrap(),
             qdrant,
+            vader,
         }
     }
     async fn process(&mut self, text: String) -> Result<(), anyhow::Error> {
@@ -71,11 +76,22 @@ impl Processor {
         }
 
         let text_str = text.as_str().unwrap();
+        let mut v: &Map<String, Value> = v.as_object().unwrap();
+        let sentiment = self.vader.polarity_scores(text_str);
+
+        let mut cv = Map::<String, Value>::new();
+        for (k, v) in v {
+            cv.insert(k.clone(), v.clone());
+        }
+        for (k, v) in sentiment {
+            cv.insert(k.to_string(), v.try_into()?);
+        }
+        let payload: Payload = cv.try_into()?;
+
         let embeds = self.model.embedding(text_str);
         match embeds {
             Some(embeds) => {
                 let embeds = embeds.to_vec();
-                let payload: Payload = v.try_into()?;
                 let points = vec![PointStruct::new(Uuid::new_v4().to_string(), embeds, payload)];
                 self.qdrant
                     .upsert_points(UpsertPointsBuilder::new("bluesky", points))
@@ -87,7 +103,6 @@ impl Processor {
         Ok(())
     }
 }
-
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
@@ -110,4 +125,4 @@ async fn main() -> Result<(), anyhow::Error> {
 }
 
 #[test]
-fn test_proc() {}
+fn test_build() {}
