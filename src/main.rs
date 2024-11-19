@@ -77,13 +77,24 @@ impl Processor {
 
         let text_str = text.as_str().unwrap();
         let mut v: &Map<String, Value> = v.as_object().unwrap();
-        let sentiment = self.vader.polarity_scores(text_str);
+        let sentiment_map = self.vader.polarity_scores(text_str);
 
         let mut cv = Map::<String, Value>::new();
+
+        let compound = sentiment_map.get("compound").unwrap();
+        let mut sentiment = 0.0;
+        if compound.abs() > 0.000001 {
+            sentiment = if *compound > 0.0 {
+                1.0
+            } else {
+                -1.0
+            }
+        }
+        cv.insert("sentiment".to_string(), sentiment.try_into()?);
         for (k, v) in v {
             cv.insert(k.clone(), v.clone());
         }
-        for (k, v) in sentiment {
+        for (k, v) in sentiment_map {
             cv.insert(k.to_string(), v.try_into()?);
         }
         let payload: Payload = cv.try_into()?;
