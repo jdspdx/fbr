@@ -8,6 +8,20 @@
 
 Very WIP
 
+This project runs both Jetstream and Qdrant in Docker.
+
+# Running Jetstream
+
+To run jetstream
+- `git submodule update --init`
+- Run `make up` in the `jetstream` directory.
+
+You can also use the public Jetstream servers, just change the URL in the code. I'll make this configurable later.
+
+# Running Qdrant
+- `cd qdrant`
+- `./run.sh
+
 # Models
 
 I am using https://dl.fbaipublicfiles.com/fasttext/vectors-crawl/cc.en.300.bin.gz
